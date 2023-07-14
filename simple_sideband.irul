@@ -1,5 +1,5 @@
 when RULE_INIT priority 500 {
-    # Version 1.0 4/7/2023 PRW 
+    # Version 1.1 14/7/2023 PRW 
     # Simple sideband iRule for doing simple sideband calls from iRules
     # Note that this must be created as /Common/simple_sideband ( or the references inside the irule updated )
     # Used for performing simple sideband operations eg to send a UDP payload of "test string":
@@ -200,4 +200,175 @@ proc udp_req { {destination ""} {payload ""} {options {}} } {
     # Procedure for sending UDP-based data
     lappend options protocol UDP
     return [call /Common/simple_sideband::request $destination $payload $options]
+}
+
+proc dns_query { fqdn } {
+    # Procedure to create a DNS A type query
+    # https://datatracker.ietf.org/doc/html/rfc1035
+
+    #                                 1  1  1  1  1  1
+    #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                      ID                       |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                    QDCOUNT                    |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                    ANCOUNT                    |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                    NSCOUNT                    |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                    ARCOUNT                    |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # Set variables
+    # Response starts as blank
+    set response ""
+    # Header
+    set ID [expr {int(rand() * 65000)}]
+    append response [binary format S $ID]
+    append response [binary format S 8]
+    append response [binary format SSSS 1 0 0 0 ]
+    # Question section
+    #                                 1  1  1  1  1  1
+    #   0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                                               |
+    # /                     QNAME                     /
+    # /                                               /
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                     QTYPE                     |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # |                     QCLASS                    |
+    # +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    # QNAME: a domain name represented as a sequence of labels, where
+    #            each label consists of a length octet followed by that
+    #            number of octets.  The domain name terminates with the
+    #            zero length octet for the null label of the root.  Note
+    #            that this field may be an odd number of octets; no
+    #            padding is used.
+    # eg www.example.com is 3www7example3com0 as format ca3ca7ca3c
+    set QNAME ""
+    foreach label [split $fqdn .] {
+        set length [string length $label]
+        append QNAME [binary format ca* $length $label]
+    }
+    # Append the null
+    append QNAME [binary format c 0]
+    append response $QNAME
+    # Add QTYPE and QCLASS
+    append response [binary format S 1 ]
+    append response [binary format S 1 ]
+    return $response
+}
+
+proc dns_response { response } {
+    # Procedure to decode a DNS response
+
+    # Example response data :
+    # 0000   d4 46 80 08 00 01 00 01 00 00 00 00 03 77 77 77
+    # 0010   07 65 78 61 6d 70 6c 65 03 63 6f 6d 00 00 01 00
+    # 0020   01 c0 0c 00 01 00 01 00 00 00 0c 00 04 01 02 03
+    # 0030   04
+    # d4 46 = query ID
+    # 80 08 is header showing response
+    # 00 01 is query number
+    # 00 01 is answer RRs number
+    # 00 00 is authority RRs number
+    # 00 00 is additional RRs number
+    # 03 77 77 77 07 65 78 61 6d 70 6c 65 03 63 6f 6d 00 is the query name
+    # 00 01 is the query TYPE
+    # 00 01 is the query CLASS
+    # c0 0c 00 01 00 01 00 00 00 0c 00 04 01 02 03 04 is the answer RR
+    # ie NAME, TYPE, CLASS, TTL, RDATALENGTH, RDATA
+    # c0 0c is a link to the NAME ( can be a label but is often null )
+    # 00 01 is TYPE
+    # 00 01 is CLASS
+    # 00 00 00 0c is TTL
+    # 00 04 is the RDATALENGTH
+    # 01 02 03 04 is the RDATA ie 1.2.3.4
+    binary scan $response SSSSSS ID HDR QRNUM ANSNUM AUTHNUM ADDNUM
+    set ID [expr { $ID & 0xffff }]
+    set HDR [expr { $HDR & 0xffff }]
+    set return [list [list $ID $HDR $QRNUM $ANSNUM $AUTHNUM $ADDNUM ]]
+    # Decode query
+    set index 12
+    set query_list [list]
+    while {$index < [string length $response]} {
+        binary scan $response @${index}c length
+        incr index 1
+        if { $length == 0 } {
+            break 
+        }
+        binary scan $response @${index}a${length} name
+        incr index $length
+        lappend query_list $name
+    }
+    set query_name [join $query_list "."]
+    binary scan $response @${index}SS query_type query_class
+    incr index 4
+    lappend return [list $query_name $query_type $query_class]
+    
+    # Decode Answer RRS
+    set answer_list {}
+    if { $ANSNUM } {
+        while { $index < [string length $response ]} {
+            binary scan $response @${index}SSSIS answer_name answer_type answer_class answer_ttl answer_length
+            incr index 12
+            set a [binary scan $response @${index}c${answer_length} answer_data]
+            incr index $answer_length
+            if { $answer_type == 1 } {
+                # If the answer is an A record, convert to dotted-decimal
+                set r [scan $answer_data "%d%d%d%d" a b c d]
+                if { $r == 4 } {
+                    set answer_data "$a.$b.$c.$d"
+                }
+            }
+            lappend answer_list [list $answer_type $answer_class $answer_ttl $answer_data]
+            if { [llength $answer_list] == $ANSNUM } { break }
+        }
+    }
+    lappend return $answer_list
+    # Decode Authority RRs
+    set auth_list {}
+    if { $AUTHNUM } {
+        while { $index < [string length $response ]} {
+            binary scan $response @${index}SSSIS auth_name auth_type auth_class auth_ttl auth_length
+            incr index 12
+            binary scan $response @${index}c${auth_length} auth_data
+            incr index $auth_length
+            if { $auth_type == 1 } {
+                # If the auth is an A record, convert to dotted-decimal
+                set r [scan $auth_data "%d%d%d%d" a b c d]
+                if { $r == 4 } {
+                    set auth_data "$a.$b.$c.$d"
+                }
+            }
+            lappend auth_list [list $auth_type $auth_class $auth_ttl $auth_data]
+            if { [llength $auth_list] == $AUTHNUM } { break }
+        }
+    }
+    lappend return $auth_list
+    
+    # Decode Additional RRs
+    set add_list {}
+    if { $ADDNUM } {
+        while { $index < [string length $response ]} {
+            binary scan $response @${index}SSSIS add_name add_type add_class add_ttl add_length
+            incr index 12
+            binary scan $response @${index}c${add_length} add_data
+            incr index $add_length
+            if { $add_type == 1 } {
+                # If the add is an A record, convert to dotted-decimal
+                set r [scan $add_data "%d%d%d%d" a b c d]
+                if { $r == 4 } {
+                    set add_data "$a.$b.$c.$d"
+                }
+            }
+            lappend add_list [list $add_type $add_class $add_ttl $add_data]
+            if { [llength $add_list] == $ADDNUM } { break }
+        }
+    }
+    lappend return $add_list
+    return $return
 }
