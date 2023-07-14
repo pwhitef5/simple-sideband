@@ -15,6 +15,7 @@ proc request { {destination ""} {payload ""} {options {}} } {
     # destination is either an IP address:port or a Virtual Server name
     # payload is a block of data - either ascii or binary
     # options contains extra options
+        # protocol - protocol name eg TCP or UDP. Default is TCP
         # debug - send debugging logs. Default is 0
         # connect_timeout - set connect timeout in secs ( default 1 sec )
         # timeout - set total timeout in seconds ( default 5 secs )
