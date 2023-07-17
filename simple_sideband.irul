@@ -1,13 +1,21 @@
 when RULE_INIT priority 500 {
-    # Version 1.1 14/7/2023 PRW 
+    # Version 1.2 17/7/2023 PRW 
     # Simple sideband iRule for doing simple sideband calls from iRules
     # Note that this must be created as /Common/simple_sideband ( or the references inside the irule updated )
     # Used for performing simple sideband operations eg to send a UDP payload of "test string":
     # set response [call /Common/simple_sideband::udp_req 10.20.20.34:53 "test string" {} ]
     # to perform a HTTP POST to the /login page:
     # set response [call /Common/simple_sideband::http_req 10.20.20.34:80 "/login" { method POST payload $payload }]
-    #
-    # 
+    # Version control
+    # 1.0 First version
+    # 1.1 Added DNS procedures
+    # 1.2 Added TLS helper iRule
+    
+    #########    Configuration Section   #################
+    # Set the name of the HTTP header used for signalling
+    set static::ss_helper_header_dst "X-SS-Destination"
+    set static::ss_helper_header_snat "X-SS-Snat"
+    ######################################################
     
 }
 proc request { {destination ""} {payload ""} {options {}} } {
@@ -59,6 +67,7 @@ proc request { {destination ""} {payload ""} {options {}} } {
             "retries" { set retries $value }
         }
     }
+    if { $debug } { log local0.debug "Received request with options $options" }
 
     # Connect to endpoint
     set success 0
@@ -74,7 +83,7 @@ proc request { {destination ""} {payload ""} {options {}} } {
             set error "Connect to $destination failed status:$conn_status error: $conn"
             continue
         }
-        if { $debug } { log local0.debug "Connected to $destination status: $conn_status" }
+        if { $debug } { log local0.debug "Connected to $destination status: $conn_status. Timeout $timeout idle $idle" }
         # Send data
         if {[catch {\
         send -status send_status $conn $payload } sent] || \
@@ -94,14 +103,16 @@ proc request { {destination ""} {payload ""} {options {}} } {
         }
         # Check received data
         set received_data ""
-        while { [expr {[clock seconds] - $start}] < $timeout } {
-            append received_data [recv -timeout 500 $conn]
-            if { $debug } { log local0.debug "Received $received_data" }
+        set iterations [expr {$timeout * 100}]
+        for {set i 0} {$i < $iterations} {incr i 1} {
+            append received_data [recv -timeout 10 $conn]
+            #if { $debug } { log local0.debug "Received $received_data" }
             if { [string length $received_data] >= $recv_bytes } {
                 break
             }
         }
         catch {close $conn}
+        if { $debug } { log local0.debug "Returning [string length $received_data]B of data" }
         return [list 0 $received_data]
     }
     return [list 1 $error]
@@ -119,6 +130,7 @@ proc http_req { {destination ""} {url "/"} {options {}} } {
     # eg { 200 {Content-Length 12} {Hello world!} }
     # Set defaults
     set tcp_options { protocol TCP recv_bytes 12}
+    set debug 0
     set method GET
     set version 1.1
     set payload ""
@@ -130,23 +142,24 @@ proc http_req { {destination ""} {url "/"} {options {}} } {
             "version" { set version $value }
             "payload" { set payload $value }
             "headers" { set headers_extra $value}
-            default { lappend tcp_options [list $option $value]}
+            "debug" { set debug 1; lappend tcp_options debug 1 }
+            default { lappend tcp_options $option $value}
         }
     }
     # Create the basic request string
     set http_request "$method $url HTTP/$version\r\n"
     # Handle headers
-    if { [string first : $destination] != -1 } {
+    if { $destination contains ":" } {
         # If the destination is an IP address or name, use it as the Host
         set headers [list Host [lindex [split $destination :] 0] ]
     } else {
-        set headers {}
+        set headers [list]
     }
-    
     if { $payload != "" } {
         # Set Content-Length
         lappend headers [list Content-Length [string length $payload]]
     }
+    
     foreach {header value} $headers_extra {
         set i [lsearch -exact $headers $header ]
         if { $i != -1 } {
@@ -154,20 +167,24 @@ proc http_req { {destination ""} {url "/"} {options {}} } {
             set headers [lreplace $headers $i [expr {$i + 1}] $header $value]
         } else {
             # Else append it
-            lappend headers [list $header $value]
+            lappend headers $header $value
         }
     }
+
     foreach {header value} $headers {
         append http_request "$header: $value\r\n"
     }
     append http_request "\r\n$payload"
+    if { $debug } { log local0.debug "HTTP request: $http_request" }
     set response [call /Common/simple_sideband::request $destination $http_request $tcp_options]
     if { [lindex $response 0] == 1 } {
         # There was an error, return error
+        if { $debug } { log local0.debug "Error response $response" }
         return [list 0 {} {}]
     } else {
         # An HTTP response which we need to decode
         set data [lindex $response 1]
+        if { $debug } { log local0.debug "Data response [string length $data]B" }
         # First, split it into headers and body based on \r\n\r\n
         set split [string first "\r\n\r\n" $data ]
         if { $split == -1 } {
@@ -179,6 +196,7 @@ proc http_req { {destination ""} {url "/"} {options {}} } {
         # Retrieve the header line eg HTTP/1.1 200 OK
         set header_line [lindex $head_list 0]
         set status_code [lindex [split $header_line " "] 1]
+        if { $debug } { log local0.debug "Status code $status_code" }
         # Handle returned headers
         set headers {}
         foreach item [lrange $head_list 1 end] {
@@ -372,4 +390,24 @@ proc dns_response { response } {
     }
     lappend return $add_list
     return $return
+}
+when HTTP_REQUEST priority 500 {
+    # Manage destination
+    if { ([HTTP::header exists $static::ss_helper_header_dst]) && ([HTTP::header value $static::ss_helper_header_dst] != "") } {
+        # Check the format
+        set header [HTTP::header value $static::ss_helper_header_dst]
+        if { !($header contains ":") } {
+            # No port set - assume it is port 443
+            set ip $header
+            set port 443
+        } else {
+            set ip [getfield $header : 1]
+            set port [getfield $header : 2]
+        }
+        node $ip $port
+    }
+    # Manage SNAT
+    if { ([HTTP::header exists $static::ss_helper_header_snat]) && ([HTTP::header value $static::ss_helper_header_snat] != "") } {
+        snat [HTTP::header value $static::ss_helper_header_snat]
+    }
 }
