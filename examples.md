@@ -42,8 +42,8 @@ curl 10.67.182.40
 `
 ### logs
 `
-Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
-Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600
+Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm\[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
+Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm\[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600
 `
 ---
 # TCP request
@@ -61,15 +61,13 @@ when HTTP_REQUEST {
 ```
 
 ## output
-`
-curl 10.67.182.40
+`curl 10.67.182.40
 0 {HTTP/1.0 200 OK
 Server: BigIP
 Connection: close
 Content-Length: 20
 
-hello world! port:80}
-`
+hello world! port:80}`
 
 ---
 # HTTP request
@@ -151,7 +149,7 @@ ltm virtual https_helper {
         tcp { }
     }
     rules {
-        simple_sideband ** <-- simple_sideband iRule **
+        simple_sideband <-- simple_sideband iRule
     }
     serverssl-use-sni disabled
     source 0.0.0.0/0
