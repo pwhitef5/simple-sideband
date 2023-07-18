@@ -2,7 +2,7 @@
 
 # DNS request
 ## iRule
-```
+```tcl
 when HTTP_REQUEST {
     # Create DNS request
     set q [call /Common/simple_sideband::dns_query "www.example.com" ]
@@ -30,8 +30,8 @@ curl 10.67.182.40
 `
 ### logs
 `
-Jul 14 08:54:26 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: query:494e0008000100000000000003777777076578616d706c6503636f6d0000010001
-Jul 14 08:54:27 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 494e8008000100010000000003777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304
+Jul 14 08:54:26 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: query:494e0008000100000000000003777777076578616d706c6503636f6d0000010001
+Jul 14 08:54:27 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 494e8008000100010000000003777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304
 `
 
 ## Additional
@@ -42,8 +42,8 @@ curl 10.67.182.40
 `
 ### logs
 `
-Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm\[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
-Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm\[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600
+Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
+Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600
 `
 ---
 # TCP request
