@@ -2,7 +2,7 @@
 
 # DNS request
 ## iRule
-`when HTTP_REQUEST {
+```when HTTP_REQUEST {
     # Create DNS request
     set q [call /Common/simple_sideband::dns_query "www.example.com" ]
     binary scan $q H* qhex
@@ -19,7 +19,7 @@
     } else {
         HTTP::respond 500 content {failure}
     }
-}`
+}```
 ## Answer only
 ### output
 `curl 10.67.182.40
@@ -33,12 +33,13 @@ Jul 14 08:54:27 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sid
 `curl 10.67.182.40
 {38749 32776 1 2 0 1} {www.example.com 1 1} {{1 1 12 1.2.3.4} {1 1 12 1.2.3.5}} {} {{2 1 12 {1 51 1 52 1 53 1 54 0}}}`
 ### logs
+
 `Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
 Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600`
 ---
 # TCP request
 
-`when HTTP_REQUEST {
+```when HTTP_REQUEST {
     # Create HTTP request
     set response [call /Common/simple_sideband::tcp_req 10.67.182.10:80 "GET /\r\n" {recv_bytes 3} ]
     if { [lindex $response 0] == 0 } {
@@ -46,7 +47,7 @@ Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm[30491]: Rule /Common/sid
     } else {
         HTTP::respond 500 content $response
     }
-}`
+}```
 
 ## output
 `curl 10.67.182.40
@@ -60,7 +61,7 @@ hello world! port:80}`
 ---
 # HTTP request
 ## iRule
-`when HTTP_REQUEST {
+```when HTTP_REQUEST {
     # Create HTTP request
     set response [call /Common/simple_sideband::http_req 10.67.182.10:80 "/" {} ]
     if { [lindex $response 0] == 200 } {
@@ -68,14 +69,14 @@ hello world! port:80}`
     } else {
         HTTP::respond 500 content $response
     }
-}`
+}```
 ## output
 `200 {Server BigIP Connection Keep-Alive Content-Length 20} {hello world! port:80}`
 
 ---
 # HTTPS
 ## Helper VS:
-`ltm virtual https_helper {
+```ltm virtual https_helper {
     creation-time 2023-07-14:09:23:06
     destination 0.0.0.0:search-agent
     ip-protocol tcp
@@ -98,9 +99,9 @@ hello world! port:80}`
     translate-port enabled
     vlans-enabled
     vs-index 3
-}`
+}```
 ## iRule
-`when HTTP_REQUEST {
+```when HTTP_REQUEST {
     # Create HTTP request
     set response [call /Common/simple_sideband::http_req "/Common/https_helper" "/" {} ]
     if { [lindex $response 0] == 200 } {
@@ -108,7 +109,7 @@ hello world! port:80}`
     } else {
         HTTP::respond 500 content $response
     }
-}`
+}```
 
 ## Output
 `curl 10.67.182.40
@@ -116,7 +117,7 @@ hello world! port:80}`
 
 ---
 # Helper iRule
-`ltm virtual https_helper {
+```ltm virtual https_helper {
     creation-time 2023-07-14:09:23:06
     destination 0.0.0.0:search-agent
     ip-protocol tcp
@@ -142,10 +143,10 @@ hello world! port:80}`
     translate-port enabled
     vlans-enabled
     vs-index 3
-}`
+}```
 
 ## iRule
-`when HTTP_REQUEST {
+```when HTTP_REQUEST {
     # Create HTTP request
     set options [list headers [list "X-SS-Destination" "10.67.182.10" "X-SS-Snat" "10.67.182.3"]]
     set response [call /Common/simple_sideband::http_req "/Common/https_helper" "/mgmt/tm/ltm/virtual" $options ]
@@ -154,7 +155,7 @@ hello world! port:80}`
     } else {
         HTTP::respond 500 content $response
     }
-}`
+}```
 ## Output
 `curl 10.67.182.40
 200 {Server BigIP Connection Keep-Alive Content-Length 21} {hello world! port:443}`
@@ -163,7 +164,7 @@ hello world! port:80}`
 ---
 # User authentication
 ## iRule
-`when HTTP_REQUEST {
+```when HTTP_REQUEST {
     # Create HTTP request
     set auth_header [b64encode "admin:admin"]
     log local0.debug "Auth header: $auth_header"
@@ -179,7 +180,7 @@ hello world! port:80}`
     } else {
         HTTP::respond 500 content $response
     }
-}`
+}```
 
 
 ## Output
