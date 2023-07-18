@@ -45,10 +45,11 @@ curl 10.67.182.40
 Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
 Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600
 `
+
 ---
 # TCP request
 
-```
+```tcl
 when HTTP_REQUEST {
     # Create HTTP request
     set response [call /Common/simple_sideband::tcp_req 10.67.182.10:80 "GET /\r\n" {recv_bytes 3} ]
@@ -72,7 +73,7 @@ hello world! port:80}`
 ---
 # HTTP request
 ## iRule
-```
+```tcl
 when HTTP_REQUEST {
     # Create HTTP request
     set response [call /Common/simple_sideband::http_req 10.67.182.10:80 "/" {} ]
@@ -115,7 +116,7 @@ ltm virtual https_helper {
 }
 ```
 ## iRule
-```
+```tcl
 when HTTP_REQUEST {
     # Create HTTP request
     set response [call /Common/simple_sideband::http_req "/Common/https_helper" "/" {} ]
@@ -163,7 +164,7 @@ ltm virtual https_helper {
 ```
 
 ## iRule
-```
+```tcl
 when HTTP_REQUEST {
     # Create HTTP request
     set options [list headers [list "X-SS-Destination" "10.67.182.10" "X-SS-Snat" "10.67.182.3"]]
@@ -185,7 +186,7 @@ curl 10.67.182.40
 ---
 # User authentication
 ## iRule
-```
+```tcl
 when HTTP_REQUEST {
     # Create HTTP request
     set auth_header [b64encode "admin:admin"]
