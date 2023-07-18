@@ -45,6 +45,7 @@ curl 10.67.182.40
 Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: query:975d0008000100000000000003777777076578616d706c6503636f6d0000010001
 Jul 14 09:05:10 simple-sideband-bigip1.pwhite debug tmm: Rule /Common/sideband_test <HTTP_REQUEST>: Success!: 975d8008000100020000000103777777076578616d706c6503636f6d0000010001c00c000100010000000c000401020304c00c000100010000000c000401020305c00c000200010000000c0009013301340135013600
 `
+
 ---
 # TCP request
 
@@ -180,7 +181,6 @@ when HTTP_REQUEST {
 curl 10.67.182.40
 200 {Server BigIP Connection Keep-Alive Content-Length 21} {hello world! port:443}
 `
-
 
 ---
 # User authentication
